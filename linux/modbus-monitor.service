@@ -1,0 +1,21 @@
+[Unit]
+Description=Modbus Monitor — веб-дашборд Modbus TCP
+Documentation=https://github.com/AHTOXA84/modbus-monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{USER}}
+WorkingDirectory=/opt/modbus-monitor
+ExecStart=/usr/bin/env node server.js
+Restart=always
+RestartSec=3
+Environment=NODE_ENV=production
+Environment=PORT=3000
+# Ограничения для изоляции сервиса (опционально):
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
