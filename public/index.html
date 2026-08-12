@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Modbus Monitor</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2310b981'/%3E%3Cpath d='M7 21l6-9 5 6 4-5 3 8' stroke='%23062018' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="topbar__inner">
+      <div class="brand">
+        <span class="brand__logo">
+          <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 21l6-9 5 6 4-5 3 8" stroke="#062018" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <div class="brand__text">
+          <div class="brand__line">
+            <h1 class="brand__title" id="brandTitle">Modbus Monitor</h1>
+            <button class="brand__edit" id="brandTitleEdit" type="button" title="Изменить название" aria-label="Изменить название">✎</button>
+          </div>
+          <div class="brand__line">
+            <p class="brand__sub" id="brandSub">Чтение регистров Modbus TCP в локальной сети</p>
+            <button class="brand__edit" id="brandSubEdit" type="button" title="Изменить подзаголовок" aria-label="Изменить подзаголовок">✎</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="topbar__right">
+        <div class="theme-select__wrap" title="Цветовая схема">
+          <span class="theme-select__swatch" id="themeSwatch"></span>
+          <select class="theme-select" id="themeSelect" aria-label="Цветовая схема">
+            <optgroup label="Тёмные">
+              <option value="emerald">Изумруд</option>
+              <option value="ocean">Океан</option>
+              <option value="sunset">Закат</option>
+              <option value="amethyst">Аметист</option>
+              <option value="midnight">Полночь</option>
+            </optgroup>
+            <optgroup label="Светлые">
+              <option value="light">День</option>
+              <option value="sky">Небо</option>
+              <option value="dawn">Заря</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="chip" id="netChip" title="Адреса в локальной сети">
+          <svg class="chip__icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+          <span id="netAddr">…</span>
+        </div>
+        <div class="chip chip--status" id="connChip" title="Статус подключения к серверу">
+          <span class="dot" id="connDot"></span>
+          <span id="connText">подключение…</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- Сводка -->
+    <section class="summary" aria-label="Сводка">
+      <div class="stat">
+        <span class="stat__num" id="statDevices">–</span>
+        <span class="stat__label">устройств</span>
+      </div>
+      <div class="stat">
+        <span class="stat__num stat__num--ok" id="statOnline">–</span>
+        <span class="stat__label">онлайн</span>
+      </div>
+      <div class="stat">
+        <span class="stat__num" id="statRegs">–</span>
+        <span class="stat__label">регистров</span>
+      </div>
+      <div class="stat">
+        <span class="stat__num stat__num--err" id="statErrors">–</span>
+        <span class="stat__label">с ошибками</span>
+      </div>
+      <div class="stat stat--poll">
+        <span class="stat__num" id="statLast">—:—:—</span>
+        <span class="stat__label">последний опрос</span>
+      </div>
+    </section>
+
+    <!-- Устройства -->
+    <section class="devices" aria-label="Устройства">
+      <div class="section-head">
+        <h2 class="section-head__title">Устройства</h2>
+        <div class="section-head__tools">
+          <label class="check" title="Периодически обновлять данные устройств"><input type="checkbox" id="statusAuto" checked> Авто</label>
+          <input type="number" class="tools-period" id="statusInterval" min="1" max="3600" step="1" value="3" title="Период автообновления, сек">
+          <button class="btn btn--ghost" id="btnRefresh" title="Обновить сейчас">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Обновить
+          </button>
+          <button class="btn btn--primary" id="btnJournal">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14M5 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2M5 4v2h14V4M8 9h8M8 13h8M8 17h4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Журнал
+          </button>
+          <button class="btn btn--ghost" id="btnConfig">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+            Настройки
+          </button>
+        </div>
+      </div>
+      <div class="devices__canvas" id="devicesCanvas"></div>
+      <p class="empty" id="emptyMsg" hidden>Нет устройств. Откройте «Настройки» и добавьте устройство.</p>
+    </section>
+
+    <!-- Журнал событий -->
+    <section class="config" id="journalPanel" aria-label="Журнал событий" hidden>
+      <div class="section-head">
+        <h2 class="section-head__title">Журнал событий</h2>
+        <div class="section-head__tools">
+          <div class="segmented" id="journalMode" title="Вид журнала">
+            <button type="button" class="segmented__btn is-active" data-mode="list">Лента</button>
+            <button type="button" class="segmented__btn" data-mode="graph">График</button>
+          </div>
+          <select class="select" id="journalDevice" title="Устройство">
+            <option value="">Все устройства</option>
+          </select>
+          <select class="select" id="journalReg" title="Регистр устройства" disabled>
+            <option value="">Все регистры</option>
+          </select>
+          <select class="select" id="journalLimit" title="Сколько записей показывать">
+            <option value="100">100</option>
+            <option value="200" selected>200</option>
+            <option value="500">500</option>
+            <option value="1000">1000</option>
+          </select>
+          <button class="btn btn--ghost" id="btnJournalRefresh" title="Обновить сейчас">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Обновить
+          </button>
+          <button class="btn btn--ghost" id="btnJournalCsv" title="Выгрузить журнал в CSV-файл">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Скачать CSV
+          </button>
+          <button class="btn btn--danger" id="btnJournalClear">Очистить</button>
+          <label class="check" title="Автообновление каждые 3 с"><input type="checkbox" id="journalAuto" checked> Авто</label>
+        </div>
+      </div>
+      <p class="empty" id="journalEmpty" hidden>Записей пока нет. Запись ведётся при изменении значений регистров, а также при старте и остановке сервера.</p>
+      <div class="journal" id="journalList" hidden></div>
+      <div class="journal-graph" id="journalGraphWrap" hidden>
+        <div class="journal-legend" id="journalLegend"></div>
+        <div class="journal-graph__canvas"><canvas id="journalGraph"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Настройки -->
+    <section class="config" id="configPanel" aria-label="Настройки" hidden>
+      <div class="section-head">
+        <h2 class="section-head__title">Настройки</h2>
+      </div>
+
+      <div class="config__blocks">
+        <div class="panel" id="devicesEditor">
+          <h3 class="panel__title">Устройства и регистры</h3>
+          <div id="deviceList"></div>
+          <div class="panel__actions">
+            <button class="btn btn--primary" id="btnAddDevice">Добавить устройство</button>
+            <button class="btn btn--accent" id="btnSave">Сохранить конфигурацию</button>
+          </div>
+          <p class="note" id="saveNote" hidden></p>
+        </div>
+
+        <div class="panel" id="loggingEditor">
+          <h3 class="panel__title">Журнал событий</h3>
+          <p class="panel__sub">Запись изменений регистров. Запись выполняется только при изменении значения и не чаще указанного интервала.</p>
+          <div class="form__row form__row--log">
+            <label class="field field--check"><input type="checkbox" class="l-enabled"><span>Включить журнал</span></label>
+            <label class="field"><span>Интервал записи, сек</span><input type="number" class="l-interval" min="0" step="any" title="Записывать изменение регистра не чаще этого интервала (в секундах)"></label>
+            <label class="field"><span>Лимит записей</span><input type="number" class="l-max" min="100" step="100" title="Максимум записей, хранящихся в журнале"></label>
+            <div class="field field--action"></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 class="panel__title">Проверка устройства</h3>
+          <p class="panel__sub">Быстрое чтение сырых регистров до добавления в конфигурацию.</p>
+          <form class="form form--grid" id="testForm">
+            <label class="field"><span>Host</span><input type="text" name="host" placeholder="192.168.1.100" required></label>
+            <label class="field"><span>Порт</span><input type="number" name="port" value="502" required></label>
+            <label class="field"><span>Unit ID</span><input type="number" name="unitId" value="1" required></label>
+            <label class="field"><span>Тип</span>
+              <select name="type">
+                <option value="holding">Holding (3x)</option>
+                <option value="input">Input (4x)</option>
+                <option value="coil">Coil (0x)</option>
+                <option value="discrete">Discrete (1x)</option>
+              </select>
+            </label>
+            <label class="field"><span>Адрес</span><input type="number" name="address" value="0" min="0" required></label>
+            <label class="field"><span>Кол-во</span><input type="number" name="count" value="2" min="1" max="16" required></label>
+            <div class="field field--action">
+              <button type="submit" class="btn btn--primary">Прочитать</button>
+            </div>
+          </form>
+          <div class="test-result" id="testResult" hidden></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>Modbus Monitor · опрос по Modbus TCP · значения обновляются автоматически</p>
+    </div>
+  </footer>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

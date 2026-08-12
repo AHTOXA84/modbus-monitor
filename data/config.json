@@ -1,0 +1,104 @@
+{
+  "pollIntervalMs": 2000,
+  "timeoutMs": 2000,
+  "simulator": {
+    "enabled": true,
+    "port": 5020
+  },
+  "logging": {
+    "enabled": true,
+    "minIntervalMs": 5000,
+    "maxEntries": 1000
+  },
+  "devices": [
+    {
+      "id": "sim-uzv",
+      "name": "Симулятор УЗВ (демо)",
+      "host": "127.0.0.1",
+      "port": 5020,
+      "unitId": 1,
+      "registers": [
+        {
+          "id": "temp",
+          "name": "Температура воды",
+          "address": 0,
+          "type": "holding",
+          "dataType": "float",
+          "scale": 1,
+          "unit": "°C",
+          "decimals": 1
+        },
+        {
+          "id": "pres",
+          "name": "Давление",
+          "address": 2,
+          "type": "holding",
+          "dataType": "float",
+          "scale": 1,
+          "unit": "бар",
+          "decimals": 2
+        },
+        {
+          "id": "pump",
+          "name": "Насос",
+          "address": 4,
+          "type": "holding",
+          "dataType": "uint16",
+          "scale": 1,
+          "unit": "",
+          "decimals": 0
+        },
+        {
+          "id": "rpm",
+          "name": "Обороты насоса",
+          "address": 5,
+          "type": "holding",
+          "dataType": "uint16",
+          "scale": 1,
+          "unit": "об/мин",
+          "decimals": 0
+        },
+        {
+          "id": "level",
+          "name": "Уровень бассейна",
+          "address": 6,
+          "type": "holding",
+          "dataType": "uint16",
+          "scale": 1,
+          "unit": "%",
+          "decimals": 0
+        },
+        {
+          "id": "ph",
+          "name": "pH воды",
+          "address": 7,
+          "type": "holding",
+          "dataType": "float",
+          "scale": 1,
+          "unit": "",
+          "decimals": 2
+        },
+        {
+          "id": "o2",
+          "name": "Кислород",
+          "address": 9,
+          "type": "holding",
+          "dataType": "float",
+          "scale": 1,
+          "unit": "мг/л",
+          "decimals": 1
+        },
+        {
+          "id": "valve",
+          "name": "Клапан аварийный",
+          "address": 11,
+          "type": "coil",
+          "dataType": "bool",
+          "scale": 1,
+          "unit": "",
+          "decimals": 0
+        }
+      ]
+    }
+  ]
+}

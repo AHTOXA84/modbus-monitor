@@ -1,0 +1,12 @@
+# Зависимости
+node_modules/
+
+# Сборочные артефакты
+build/
+
+# Логи и рантайм-данные
+data/event-log.json
+*.log
+
+# Прочее
+.opencode/
