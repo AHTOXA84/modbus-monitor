@@ -10,6 +10,54 @@
     "minIntervalMs": 5000,
     "maxEntries": 1000
   },
+  "alarms": {
+    "enabled": true,
+    "resendIntervalSec": 3600,
+    "notify": {
+      "telegram": {
+        "enabled": false,
+        "botToken": "",
+        "chatId": ""
+      },
+      "http": {
+        "enabled": false,
+        "url": "",
+        "headers": {}
+      },
+      "email": {
+        "enabled": false,
+        "host": "",
+        "port": 465,
+        "secure": true,
+        "starttls": true,
+        "user": "",
+        "password": "",
+        "from": "",
+        "to": ""
+      }
+    },
+    "rules": [
+      {
+        "id": "temp-high",
+        "deviceId": "sim-uzv",
+        "registerId": "temp",
+        "condition": ">",
+        "threshold": 19,
+        "hysteresis": 0.5,
+        "severity": "warning",
+        "message": "Температура воды выше нормы: {value} °C"
+      },
+      {
+        "id": "valve-open",
+        "deviceId": "sim-uzv",
+        "registerId": "valve",
+        "kind": "coil",
+        "coilValue": true,
+        "severity": "critical",
+        "message": "Аварийный клапан ОТКРЫТ"
+      }
+    ]
+  },
   "devices": [
     {
       "id": "sim-uzv",
@@ -46,7 +94,8 @@
           "dataType": "uint16",
           "scale": 1,
           "unit": "",
-          "decimals": 0
+          "decimals": 0,
+          "writable": true
         },
         {
           "id": "rpm",
@@ -96,7 +145,8 @@
           "dataType": "bool",
           "scale": 1,
           "unit": "",
-          "decimals": 0
+          "decimals": 0,
+          "writable": true
         }
       ]
     }

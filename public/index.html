@@ -59,6 +59,15 @@
 
   <main class="container">
 
+    <!-- Баннер активных тревог -->
+    <div class="alarm-banner" id="alarmBanner" hidden>
+      <div class="alarm-banner__inner">
+        <span class="alarm-banner__icon" aria-hidden="true">▲</span>
+        <div class="alarm-banner__list" id="alarmBannerList"></div>
+        <button class="btn btn--ghost btn--sm" id="btnAlarmBannerGo" type="button">Тревоги</button>
+      </div>
+    </div>
+
     <!-- Сводка -->
     <section class="summary" aria-label="Сводка">
       <div class="stat">
@@ -97,6 +106,10 @@
           <button class="btn btn--primary" id="btnJournal">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14M5 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2M5 4v2h14V4M8 9h8M8 13h8M8 17h4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Журнал
+          </button>
+          <button class="btn btn--primary" id="btnAlarms">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v1.05A7 7 0 0 1 19 12v6h1a1 1 0 1 1 0 2H4a1 1 0 1 1 0-2h1v-6a7 7 0 0 1 6-6.95V4a1 1 0 0 1 1-1zm-3 17h6a3 3 0 0 1-6 0z" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Тревоги
           </button>
           <button class="btn btn--ghost" id="btnConfig">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
@@ -146,6 +159,67 @@
       <div class="journal-graph" id="journalGraphWrap" hidden>
         <div class="journal-legend" id="journalLegend"></div>
         <div class="journal-graph__canvas"><canvas id="journalGraph"></canvas></div>
+      </div>
+    </section>
+
+    <!-- Тревоги -->
+    <section class="config" id="alarmsPanel" aria-label="Тревоги" hidden>
+      <div class="section-head">
+        <h2 class="section-head__title">Тревоги</h2>
+        <div class="section-head__tools">
+          <label class="check" title="Включить/выключить проверку правил"><input type="checkbox" id="alarmsEnabled"> Включены</label>
+          <label class="field field--inline" title="Повтор уведомления при продолжающейся тревоге, сек (0 — не повторять)"><span>Повтор, сек</span><input type="number" id="alarmsResend" min="0" step="60" value="3600"></label>
+          <button class="btn btn--accent" id="btnAlarmsSave">Сохранить</button>
+        </div>
+      </div>
+      <p class="note" id="alarmsNote" hidden></p>
+
+      <div class="config__blocks">
+        <div class="panel">
+          <h3 class="panel__title">Активные тревоги</h3>
+          <p class="panel__sub" id="alarmsActiveEmpty">Сейчас активных тревог нет.</p>
+          <div id="alarmsActiveList"></div>
+        </div>
+
+        <div class="panel">
+          <h3 class="panel__title">Уведомления</h3>
+          <p class="panel__sub">При срабатывании тревоги отправляется уведомление во все включённые каналы. Рекомендации: Telegram — быстрое уведомление на телефон (бот + chat id); HTTP-вебхук — универсально (ntfy.sh, Home Assistant и т.п.); Email — через SMTP (Gmail/Яндекс/Mail.ru).</p>
+          <div class="alarms-grid">
+            <div class="alarm-channel">
+              <h4 class="alarm-channel__title">Telegram</h4>
+              <label class="field field--check"><input type="checkbox" class="tg-enabled"><span>Включить</span></label>
+              <label class="field"><span>Bot token</span><input type="password" class="tg-token" autocomplete="off"></label>
+              <label class="field"><span>Chat ID</span><input type="text" class="tg-chat" placeholder="123456789"></label>
+            </div>
+            <div class="alarm-channel">
+              <h4 class="alarm-channel__title">HTTP-вебхук</h4>
+              <label class="field field--check"><input type="checkbox" class="http-enabled"><span>Включить</span></label>
+              <label class="field"><span>URL</span><input type="text" class="http-url" placeholder="https://ntfy.sh/mytopic"></label>
+              <label class="field"><span>Headers (JSON)</span><input type="text" class="http-headers" placeholder='{"Authorization": "Bearer ..."}'></label>
+            </div>
+            <div class="alarm-channel">
+              <h4 class="alarm-channel__title">Email (SMTP)</h4>
+              <label class="field field--check"><input type="checkbox" class="em-enabled"><span>Включить</span></label>
+              <label class="field"><span>SMTP host</span><input type="text" class="em-host" placeholder="smtp.gmail.com"></label>
+              <label class="field"><span>Порт</span><input type="number" class="em-port" value="465" min="1" max="65535"></label>
+              <label class="field field--check"><input type="checkbox" class="em-secure"><span>SSL/TLS (465)</span></label>
+              <label class="field field--check"><input type="checkbox" class="em-starttls"><span>STARTTLS (587)</span></label>
+              <label class="field"><span>Логин</span><input type="text" class="em-user" autocomplete="off"></label>
+              <label class="field"><span>Пароль</span><input type="password" class="em-pass" autocomplete="off"></label>
+              <label class="field"><span>От кого (From)</span><input type="text" class="em-from" placeholder="you@gmail.com"></label>
+              <label class="field"><span>Кому (To)</span><input type="text" class="em-to" placeholder="a@mail.ru; b@mail.ru"></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 class="panel__title">Правила тревог</h3>
+          <p class="panel__sub">Срабатывание: выход значения за порог (гистерезис снимает тревогу) или изменение coil-регистра. В сообщении можно использовать {value} — текущее значение.</p>
+          <div id="alarmsRules"></div>
+          <div class="panel__actions">
+            <button class="btn btn--ghost" id="btnAlarmAddRule">Добавить правило</button>
+          </div>
+        </div>
       </div>
     </section>
 

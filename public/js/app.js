@@ -18,6 +18,7 @@
     dragging: false,      // идёт перетаскивание (пауза обновлений)
     editingName: false,   // редактируется название
     pendingStatus: null,  // статус, накопленный во время паузы
+    alarms: { config: null, active: [] },
     theme: 'emerald'
   };
 
@@ -88,7 +89,17 @@
     statusInterval: $('#statusInterval'),
     logEnabled: $('#loggingEditor .l-enabled'),
     logInterval: $('#loggingEditor .l-interval'),
-    logMax: $('#loggingEditor .l-max')
+    logMax: $('#loggingEditor .l-max'),
+    alarmBanner: $('#alarmBanner'),
+    alarmBannerList: $('#alarmBannerList'),
+    btnAlarmBannerGo: $('#btnAlarmBannerGo'),
+    alarmsPanel: $('#alarmsPanel'),
+    alarmsEnabled: $('#alarmsEnabled'),
+    alarmsResend: $('#alarmsResend'),
+    alarmsNote: $('#alarmsNote'),
+    alarmsActiveEmpty: $('#alarmsActiveEmpty'),
+    alarmsActiveList: $('#alarmsActiveList'),
+    alarmsRules: $('#alarmsRules')
   };
 
   /* ---------- Сеть ---------- */
@@ -584,6 +595,88 @@
   }
 
   /* ---------- Рендер статуса ---------- */
+  async function apiWrite(deviceId, registerId, value, widget) {
+    if (widget) widget.disabled = true;
+    const isButton = widget && widget.tagName === 'BUTTON';
+    const oldText = isButton ? widget.textContent : '';
+    if (isButton) widget.textContent = '…';
+    try {
+      const r = await fetch('/api/write', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceId, registerId, value })
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+      if (isButton) {
+        widget.textContent = '✓';
+        setTimeout(() => { widget.textContent = oldText; }, 1200);
+      }
+      refreshStatus();
+    } catch (e) {
+      if (isButton) {
+        widget.textContent = '✕';
+        setTimeout(() => { widget.textContent = oldText; }, 1200);
+      } else if (widget && widget.type === 'checkbox') {
+        widget.checked = !widget.checked;
+      }
+      alert('Ошибка записи: ' + e.message);
+    } finally {
+      if (widget) widget.disabled = false;
+    }
+  }
+
+  function controlWidget(v, devId) {
+    if (!v.writable) return null;
+    const isBool = v.type === 'coil' || v.dataType === 'bool';
+    if (isBool) {
+      const on = v.value === 1 || v.value === true;
+      const lb = el('label', 'switch' + (v.value === null ? ' is-disabled' : ''));
+      lb.title = 'Переключить: сейчас ' + (on ? 'ВКЛ' : 'ВЫКЛ');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = on;
+      cb.disabled = v.value === null;
+      cb.addEventListener('change', () => apiWrite(devId, v.id, cb.checked, cb));
+      const slider = el('span', 'switch__slider');
+      lb.appendChild(cb);
+      lb.appendChild(slider);
+      return lb;
+    }
+    const box = el('span', 'reg__ctrl');
+    const inp = document.createElement('input');
+    inp.type = 'number';
+    inp.className = 'reg__input';
+    const step = Math.pow(10, -Math.max(0, Math.min(v.decimals || 0, 6)));
+    inp.step = String(step);
+    if (v.value !== null && isFinite(v.value)) inp.value = v.value;
+    inp.disabled = v.value === null;
+    const wBtn = el('button', 'btn btn--ghost btn--sm reg__write', 'Записать');
+    wBtn.type = 'button';
+    wBtn.addEventListener('click', () => apiWrite(devId, v.id, Number(inp.value), wBtn));
+    box.appendChild(inp);
+    box.appendChild(wBtn);
+    return box;
+  }
+
+  function renderAlarmBanner(status) {
+    const a = status.alarms || { enabled: false, active: [] };
+    const list = a.active || [];
+    const banner = UI.alarmBanner;
+    if (!list.length) { banner.hidden = true; return; }
+    banner.hidden = false;
+    banner.classList.toggle('has-critical', list.some(x => x.severity === 'critical'));
+    UI.alarmBannerList.innerHTML = '';
+    for (const al of list) {
+      const item = el('span', 'alarm-banner__item alarm-banner__item--' + (al.severity || 'warning'));
+      item.textContent = (al.message || al.ruleId);
+      item.title = 'Устройство ' + (al.deviceId || '') + ' · ' +
+        (al.registerId || '') + ' · значение ' + al.value + ' · с ' +
+        new Date(al.since).toLocaleString('ru-RU');
+      UI.alarmBannerList.appendChild(item);
+    }
+  }
+
   function renderStatus(status) {
     // Во время перетаскивания/редактирования не перестраиваем DOM
     if (state.dragging || state.editingName) {
@@ -630,7 +723,7 @@
       const body = el('div', 'device-card__body');
       for (const v of dev.values) {
         const row = el('div', 'reg');
-        row.appendChild(el('span', 'reg__name', v.name));
+        row.appendChild(el('span', 'reg__name', v.name + (v.writable ? ' ✎' : '')));
 
         const val = el('span', 'reg__value');
         const label = regLabel(v);
@@ -649,6 +742,8 @@
           if (!v.updatedAt) val.classList.add('reg__value--err');
         }
         row.appendChild(val);
+        const ctrl = controlWidget(v, dev.id);
+        if (ctrl) row.appendChild(ctrl);
         body.appendChild(row);
       }
       card.appendChild(body);
@@ -673,6 +768,8 @@
     UI.statErrors.textContent = errors;
     UI.statLast.textContent = status.generatedAt
       ? new Date(status.generatedAt).toLocaleTimeString('ru-RU') : '—';
+
+    renderAlarmBanner(status);
   }
 
   /* ---------- Перетаскивание окон с привязкой к сетке ---------- */
@@ -872,7 +969,7 @@
         row1.style.gridTemplateColumns = '1.5fr 0.7fr 0.9fr 1fr';
 
         const row2 = el('div', 'form__row');
-        row2.style.gridTemplateColumns = '0.8fr 0.8fr 0.7fr auto';
+        row2.style.gridTemplateColumns = '0.8fr 0.8fr 0.7fr auto auto';
 
         const mk = (field, opts, target) => {
           const f = el('label', 'field');
@@ -907,6 +1004,17 @@
         mk('scale', null, row2);
         mk('unit', null, row2);
         mk('decimals', null, row2);
+
+        const wcb = el('label', 'field field--check');
+        const wInp = document.createElement('input');
+        wInp.type = 'checkbox';
+        wInp.className = 'reg-writable';
+        wInp.checked = !!reg.writable;
+        wInp.title = 'Разрешить запись значения с панели';
+        wInp.addEventListener('change', () => { reg.writable = wInp.checked; });
+        wcb.appendChild(wInp);
+        wcb.appendChild(el('span', null, 'Запись'));
+        row2.appendChild(wcb);
 
         const btns = el('div', 'reg-btns');
         const up = el('button', 'btn btn--ghost btn--sm', '↑');
@@ -981,7 +1089,8 @@
           dataType: c(3).value,
           scale: Number(c(4).value) || 1,
           unit: c(5).value,
-          decimals: Number(c(6).value) || 0
+          decimals: Number(c(6).value) || 0,
+          writable: !!row.querySelector('.reg-writable').checked
         });
       });
       return dev;
@@ -1155,6 +1264,323 @@
       UI.testResult.hidden = false;
     }
   });
+
+  /* ---------- Тревоги ---------- */
+  function openAlarmsPanel() {
+    const open = UI.alarmsPanel.hidden;
+    UI.alarmsPanel.hidden = !open;
+    if (open) loadAlarms();
+  }
+
+  $('#btnAlarms').addEventListener('click', openAlarmsPanel);
+  UI.btnAlarmBannerGo.addEventListener('click', openAlarmsPanel);
+
+  async function loadAlarms() {
+    try {
+      const r = await fetch('/api/alarms', { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const data = await r.json();
+      state.alarms = { config: data.config, active: data.active || [] };
+      renderAlarmsUI();
+    } catch { /* сервер недоступен */ }
+  }
+
+  function renderAlarmsUI() {
+    const A = state.alarms.config || {};
+    UI.alarmsEnabled.checked = A.enabled !== false;
+    UI.alarmsResend.value = A.resendIntervalSec != null ? A.resendIntervalSec : 3600;
+
+    const tg = A.notify && A.notify.telegram ? A.notify.telegram : {};
+    document.querySelector('.tg-enabled').checked = !!tg.enabled;
+    document.querySelector('.tg-token').value = tg.botToken || '';
+    document.querySelector('.tg-chat').value = tg.chatId || '';
+
+    const http = A.notify && A.notify.http ? A.notify.http : {};
+    document.querySelector('.http-enabled').checked = !!http.enabled;
+    document.querySelector('.http-url').value = http.url || '';
+    document.querySelector('.http-headers').value = http.headers ? JSON.stringify(http.headers) : '';
+
+    const em = A.notify && A.notify.email ? A.notify.email : {};
+    document.querySelector('.em-enabled').checked = !!em.enabled;
+    document.querySelector('.em-host').value = em.host || '';
+    document.querySelector('.em-port').value = em.port || (em.secure ? 465 : 587);
+    document.querySelector('.em-secure').checked = !!em.secure;
+    document.querySelector('.em-starttls').checked = em.starttls !== false;
+    document.querySelector('.em-user').value = em.user || '';
+    document.querySelector('.em-pass').value = em.password || '';
+    document.querySelector('.em-from').value = em.from || '';
+    document.querySelector('.em-to').value = em.to || '';
+
+    renderActiveAlarms();
+    renderAlarmRules();
+  }
+
+  function renderActiveAlarms() {
+    const list = state.alarms.active || [];
+    UI.alarmsActiveEmpty.hidden = list.length > 0;
+    UI.alarmsActiveList.innerHTML = '';
+    for (const al of list) {
+      const row = el('div', 'alarm-row alarm-row--' + (al.severity || 'warning'));
+      row.appendChild(el('span', 'alarm-row__tag', (al.severity || 'warning').toUpperCase()));
+      const body = el('span', 'alarm-row__body');
+      body.appendChild(el('span', 'alarm-row__msg', al.message || al.ruleId));
+      body.appendChild(el('span', 'alarm-row__meta',
+        'с ' + new Date(al.since).toLocaleString('ru-RU') + ' · значение ' + al.value));
+      row.appendChild(body);
+      UI.alarmsActiveList.appendChild(row);
+    }
+  }
+
+  function alarmRuleRow(rule) {
+    const wrap = el('div', 'alarm-rule');
+    const devices = state.config ? state.config.devices : [];
+    const currentDev = devices.find(d => d.id === rule.deviceId);
+
+    const mkSel = (opts) => {
+      const s = document.createElement('select');
+      for (const o of opts) {
+        const opt = document.createElement('option');
+        opt.value = o.value;
+        opt.textContent = o.label;
+        s.appendChild(opt);
+      }
+      return s;
+    };
+
+    const selDev = mkSel(devices.map(d => ({ value: d.id, label: d.name || d.id })));
+    if (currentDev) selDev.value = rule.deviceId;
+
+    const selReg = document.createElement('select');
+    const fillRegs = () => {
+      selReg.innerHTML = '';
+      const dev = devices.find(d => d.id === selDev.value);
+      (dev ? dev.registers || [] : []).forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.id;
+        opt.textContent = (r.name || r.id) + ' (' + (r.type || 'holding') + ' ' + r.address + ')';
+        selReg.appendChild(opt);
+      });
+      if (rule.registerId && [...selReg.options].some(o => o.value === rule.registerId)) {
+        selReg.value = rule.registerId;
+      }
+    };
+    fillRegs();
+
+    const selKind = mkSel([
+      { value: 'value', label: 'По значению' },
+      { value: 'coil', label: 'По coil (вкл/выкл)' }
+    ]);
+    selKind.value = rule.kind === 'coil' ? 'coil' : 'value';
+
+    const selCond = mkSel(['>', '>=', '<', '<=', '==', '!='].map(c => ({ value: c, label: c })));
+    if (rule.condition) selCond.value = rule.condition;
+
+    const inpThr = document.createElement('input');
+    inpThr.type = 'number';
+    inpThr.step = 'any';
+    inpThr.value = rule.threshold != null ? rule.threshold : 0;
+
+    const inpHys = document.createElement('input');
+    inpHys.type = 'number';
+    inpHys.step = 'any';
+    inpHys.min = '0';
+    inpHys.value = rule.hysteresis != null ? rule.hysteresis : 0;
+
+    const selCoil = mkSel([{ value: 'true', label: 'ВКЛ (true)' }, { value: 'false', label: 'ВЫКЛ (false)' }]);
+    selCoil.value = String(rule.coilValue !== false);
+
+    const selSev = mkSel(['info', 'warning', 'critical'].map(s => ({ value: s, label: s })));
+    selSev.className = 'alarm-rule__sev';
+    if (rule.severity) selSev.value = rule.severity;
+
+    const inpMsg = document.createElement('input');
+    inpMsg.type = 'text';
+    inpMsg.className = 'alarm-rule__msg';
+    inpMsg.value = rule.message || '';
+
+    const syncKind = () => {
+      const dev = devices.find(d => d.id === selDev.value);
+      const reg = dev ? (dev.registers || []).find(r => r.id === selReg.value) : null;
+      if (reg && (reg.type === 'coil' || reg.type === 'discrete' || reg.dataType === 'bool')) {
+        selKind.value = 'coil';
+      } else if (selKind.value === 'coil') {
+        selKind.value = 'value';
+      }
+    };
+
+    selDev.addEventListener('change', () => { fillRegs(); syncKind(); });
+    selReg.addEventListener('change', syncKind);
+
+    const delBtn = el('button', 'btn btn--danger btn--sm', '✕');
+    delBtn.type = 'button';
+    delBtn.addEventListener('click', () => wrap.remove());
+
+    const f = (label, ctrl) => {
+      const l = el('label', 'field');
+      l.appendChild(el('span', null, label));
+      l.appendChild(ctrl);
+      return l;
+    };
+
+    const row1 = el('div', 'form__row');
+    row1.style.gridTemplateColumns = '1fr 1fr 1.1fr auto';
+    row1.appendChild(f('Устройство', selDev));
+    row1.appendChild(f('Регистр', selReg));
+    row1.appendChild(f('Тип', selKind));
+    const btnCell = el('div', 'field field--action');
+    btnCell.appendChild(delBtn);
+    row1.appendChild(btnCell);
+
+    const row2 = el('div', 'form__row alarm-rule__value-fields');
+    row2.style.gridTemplateColumns = '0.8fr 0.8fr 0.8fr 1.2fr';
+    const valFields = el('div', 'alarm-rule__valfields');
+    valFields.appendChild(f('Условие', selCond));
+    valFields.appendChild(f('Порог', inpThr));
+    valFields.appendChild(f('Гистерезис', inpHys));
+    valFields.appendChild(f('Сообщение', inpMsg));
+    const coilFields = el('div', 'alarm-rule__coilfields');
+    coilFields.appendChild(f('Состояние', selCoil));
+    coilFields.appendChild(f('Сообщение', inpMsg));
+    row2.appendChild(valFields);
+    row2.appendChild(coilFields);
+
+    const sevRow = el('div', 'form__row');
+    sevRow.style.gridTemplateColumns = '0.6fr';
+    sevRow.appendChild(f('Важность', selSev));
+
+    const toggleKindFields = () => {
+      const coil = selKind.value === 'coil';
+      valFields.hidden = coil;
+      coilFields.hidden = !coil;
+    };
+    selKind.addEventListener('change', toggleKindFields);
+    toggleKindFields();
+    syncKind();
+
+    wrap.appendChild(row1);
+    wrap.appendChild(row2);
+    wrap.appendChild(sevRow);
+    return wrap;
+  }
+
+  function renderAlarmRules() {
+    UI.alarmsRules.innerHTML = '';
+    const rules = state.alarms.config && state.alarms.config.rules ? state.alarms.config.rules : [];
+    if (!rules.length) {
+      UI.alarmsRules.appendChild(el('p', 'empty', 'Правил пока нет. Добавьте правило — например, выход температуры за порог или открытие клапана.'));
+      return;
+    }
+    for (const rule of rules) UI.alarmsRules.appendChild(alarmRuleRow(Object.assign({}, rule)));
+  }
+
+  $('#btnAlarmAddRule').addEventListener('click', () => {
+    const dev = state.config && state.config.devices[0];
+    const reg = dev && dev.registers[0];
+    const rule = {
+      id: 'a' + Date.now().toString(36),
+      deviceId: dev ? dev.id : '',
+      registerId: reg ? reg.id : '',
+      condition: '>',
+      threshold: 0,
+      hysteresis: 0,
+      severity: 'warning',
+      message: ''
+    };
+    UI.alarmsRules.appendChild(alarmRuleRow(rule));
+  });
+
+  function readAlarmsUI() {
+    const headersRaw = document.querySelector('.http-headers').value.trim();
+    let headers = {};
+    if (headersRaw) {
+      try { headers = JSON.parse(headersRaw); } catch { headers = {}; }
+    }
+    return {
+      enabled: UI.alarmsEnabled.checked,
+      resendIntervalSec: Math.max(0, Number(UI.alarmsResend.value) || 0),
+      notify: {
+        telegram: {
+          enabled: document.querySelector('.tg-enabled').checked,
+          botToken: document.querySelector('.tg-token').value.trim(),
+          chatId: document.querySelector('.tg-chat').value.trim()
+        },
+        http: {
+          enabled: document.querySelector('.http-enabled').checked,
+          url: document.querySelector('.http-url').value.trim(),
+          headers
+        },
+        email: {
+          enabled: document.querySelector('.em-enabled').checked,
+          host: document.querySelector('.em-host').value.trim(),
+          port: Number(document.querySelector('.em-port').value) || 587,
+          secure: document.querySelector('.em-secure').checked,
+          starttls: document.querySelector('.em-starttls').checked,
+          user: document.querySelector('.em-user').value.trim(),
+          password: document.querySelector('.em-pass').value,
+          from: document.querySelector('.em-from').value.trim(),
+          to: document.querySelector('.em-to').value.trim()
+        }
+      }
+    };
+  }
+
+  function readAlarmsRules() {
+    const rules = [];
+    for (const wrap of UI.alarmsRules.querySelectorAll('.alarm-rule')) {
+      const selDev = wrap.querySelector('select');
+      const selReg = wrap.querySelectorAll('select')[1];
+      const selKind = wrap.querySelectorAll('select')[2];
+      const coil = selKind.value === 'coil';
+      const valFields = wrap.querySelector('.alarm-rule__valfields');
+      const coilFields = wrap.querySelector('.alarm-rule__coilfields');
+      const severity = wrap.querySelector('.alarm-rule__sev').value;
+      let rule = {
+        id: 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+        deviceId: selDev.value,
+        registerId: selReg.value,
+        kind: coil ? 'coil' : 'value',
+        severity
+      };
+      if (coil) {
+        rule.coilValue = coilFields.querySelector('select').value === 'true';
+        rule.message = coilFields.querySelector('input').value.trim();
+      } else {
+        rule.condition = valFields.querySelectorAll('select')[0].value;
+        rule.threshold = Number(valFields.querySelectorAll('input')[0].value) || 0;
+        rule.hysteresis = Number(valFields.querySelectorAll('input')[1].value) || 0;
+        rule.message = valFields.querySelectorAll('input')[2].value.trim();
+      }
+      rules.push(rule);
+    }
+    return rules;
+  }
+
+  async function saveAlarms() {
+    UI.alarmsNote.hidden = true;
+    UI.alarmsNote.className = 'note';
+    try {
+      const payload = readAlarmsUI();
+      payload.rules = readAlarmsRules();
+      const r = await fetch('/api/alarms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+      state.alarms.config = data.config;
+      UI.alarmsNote.textContent = 'Тревоги сохранены. Правила пересчитаются при следующем опросе.';
+      UI.alarmsNote.className = 'note note--ok';
+      UI.alarmsNote.hidden = false;
+      refreshStatus();
+    } catch (e) {
+      UI.alarmsNote.textContent = 'Ошибка сохранения: ' + e.message;
+      UI.alarmsNote.className = 'note note--err';
+      UI.alarmsNote.hidden = false;
+    }
+  }
+
+  $('#btnAlarmsSave').addEventListener('click', saveAlarms);
 
   /* ---------- Инициализация ---------- */
   loadPositions();
