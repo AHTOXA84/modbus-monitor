@@ -1295,6 +1295,12 @@
     document.querySelector('.tg-token').value = tg.botToken || '';
     document.querySelector('.tg-chat').value = tg.chatId || '';
 
+    const mx = A.notify && A.notify.max ? A.notify.max : {};
+    document.querySelector('.mx-enabled').checked = !!mx.enabled;
+    document.querySelector('.mx-token').value = mx.token || '';
+    document.querySelector('.mx-recipient').value = mx.recipient || '';
+    document.querySelector('.mx-type').value = mx.recipientType === 'chat_id' ? 'chat_id' : 'user_id';
+
     const http = A.notify && A.notify.http ? A.notify.http : {};
     document.querySelector('.http-enabled').checked = !!http.enabled;
     document.querySelector('.http-url').value = http.url || '';
@@ -1503,6 +1509,12 @@
           enabled: document.querySelector('.tg-enabled').checked,
           botToken: document.querySelector('.tg-token').value.trim(),
           chatId: document.querySelector('.tg-chat').value.trim()
+        },
+        max: {
+          enabled: document.querySelector('.mx-enabled').checked,
+          token: document.querySelector('.mx-token').value.trim(),
+          recipient: document.querySelector('.mx-recipient').value.trim(),
+          recipientType: document.querySelector('.mx-type').value
         },
         http: {
           enabled: document.querySelector('.http-enabled').checked,

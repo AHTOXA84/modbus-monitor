@@ -55,8 +55,21 @@ function loadConfig() {
   }
 }
 
+function sanitizeForSave(obj) {
+  if (Array.isArray(obj)) return obj.map(sanitizeForSave);
+  if (obj && typeof obj === 'object') {
+    const out = {};
+    for (const k of Object.keys(obj)) {
+      if (k.startsWith('_')) continue;
+      out[k] = sanitizeForSave(obj[k]);
+    }
+    return out;
+  }
+  return obj;
+}
+
 function saveConfig(cfg) {
-  try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), 'utf8'); }
+  try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(sanitizeForSave(cfg), null, 2), 'utf8'); }
   catch (e) { console.error('  Не удалось сохранить конфиг:', e.message); }
 }
 
@@ -66,6 +79,7 @@ function defaultAlarms() {
     resendIntervalSec: 3600,
     notify: {
       telegram: { enabled: false, botToken: '', chatId: '' },
+      max: { enabled: false, token: '', recipientType: 'user_id', recipient: '' },
       http: { enabled: false, url: '', headers: {} },
       email: { enabled: false, host: '', port: 465, secure: true, starttls: true, user: '', password: '', from: '', to: '' }
     },
@@ -716,6 +730,9 @@ function sendNotifications(title, text, ctx) {
   if (N.telegram && N.telegram.enabled && N.telegram.botToken && N.telegram.chatId) {
     wrap(notifyTelegram(N.telegram, text), 'telegram'); sent.push('telegram');
   }
+  if (N.max && N.max.enabled && N.max.token && N.max.recipient) {
+    wrap(notifyMax(N.max, text), 'max'); sent.push('max');
+  }
   if (N.http && N.http.enabled && N.http.url) {
     wrap(notifyHttp(N.http, { title, text, severity: ctx.severity, deviceId: ctx.deviceId, registerId: ctx.registerId, time: Date.now() }), 'http');
     sent.push('http');
@@ -735,6 +752,16 @@ async function notifyTelegram(n, text) {
     body: JSON.stringify({ chat_id: n.chatId, text, disable_web_page_preview: true })
   });
   if (!r.ok) throw new Error('Telegram HTTP ' + r.status + ': ' + (await r.text()).slice(0, 200));
+}
+
+async function notifyMax(n, text) {
+  const key = n.recipientType === 'chat_id' ? 'chat_id' : 'user_id';
+  const r = await fetch('https://platform-api2.max.ru/messages?' + key + '=' + encodeURIComponent(n.recipient), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': String(n.token) },
+    body: JSON.stringify({ text })
+  });
+  if (!r.ok) throw new Error('MAX HTTP ' + r.status + ': ' + (await r.text()).slice(0, 200));
 }
 
 async function notifyHttp(n, payload) {
@@ -920,6 +947,14 @@ async function handleApi(req, res, url) {
           enabled: !!body.notify.http.enabled,
           url: String(body.notify.http.url || ''),
           headers: (body.notify.http.headers && typeof body.notify.http.headers === 'object') ? body.notify.http.headers : {}
+        };
+      }
+      if (body.notify.max && typeof body.notify.max === 'object') {
+        n.max = {
+          enabled: !!body.notify.max.enabled,
+          token: String(body.notify.max.token || ''),
+          recipientType: body.notify.max.recipientType === 'chat_id' ? 'chat_id' : 'user_id',
+          recipient: String(body.notify.max.recipient || '')
         };
       }
       if (body.notify.email && typeof body.notify.email === 'object') {

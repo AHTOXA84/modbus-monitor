@@ -19,6 +19,12 @@
         "botToken": "",
         "chatId": ""
       },
+      "max": {
+        "enabled": false,
+        "token": "",
+        "recipientType": "user_id",
+        "recipient": ""
+      },
       "http": {
         "enabled": false,
         "url": "",

@@ -183,13 +183,25 @@
 
         <div class="panel">
           <h3 class="panel__title">Уведомления</h3>
-          <p class="panel__sub">При срабатывании тревоги отправляется уведомление во все включённые каналы. Рекомендации: Telegram — быстрое уведомление на телефон (бот + chat id); HTTP-вебхук — универсально (ntfy.sh, Home Assistant и т.п.); Email — через SMTP (Gmail/Яндекс/Mail.ru).</p>
+          <p class="panel__sub">При срабатывании тревоги отправляется уведомление во все включённые каналы. Рекомендации: Telegram — быстрое уведомление на телефон (бот + chat id); MAX — мессенджер VK (access token бота + user_id/chat_id, платформа platform-api2.max.ru); HTTP-вебхук — универсально (ntfy.sh, Home Assistant и т.п.); Email — через SMTP (Gmail/Яндекс/Mail.ru).</p>
           <div class="alarms-grid">
             <div class="alarm-channel">
               <h4 class="alarm-channel__title">Telegram</h4>
               <label class="field field--check"><input type="checkbox" class="tg-enabled"><span>Включить</span></label>
               <label class="field"><span>Bot token</span><input type="password" class="tg-token" autocomplete="off"></label>
               <label class="field"><span>Chat ID</span><input type="text" class="tg-chat" placeholder="123456789"></label>
+            </div>
+            <div class="alarm-channel">
+              <h4 class="alarm-channel__title">MAX</h4>
+              <label class="field field--check"><input type="checkbox" class="mx-enabled"><span>Включить</span></label>
+              <label class="field"><span>Access token бота</span><input type="password" class="mx-token" autocomplete="off"></label>
+              <label class="field"><span>Получатель (ID)</span><input type="text" class="mx-recipient" placeholder="123456789"></label>
+              <label class="field"><span>Тип получателя</span>
+                <select class="mx-type">
+                  <option value="user_id">user_id (личный диалог)</option>
+                  <option value="chat_id">chat_id (чат/канал)</option>
+                </select>
+              </label>
             </div>
             <div class="alarm-channel">
               <h4 class="alarm-channel__title">HTTP-вебхук</h4>
